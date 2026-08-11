@@ -1,0 +1,191 @@
+[
+  {
+    "id": "q01",
+    "question": "What is the recommended chunk size for the baseline RAG configuration?",
+    "answer": "900 characters",
+    "relevant_keywords": [
+      "900",
+      "chunk"
+    ],
+    "relevant_sources": [
+      "architecture.md"
+    ]
+  },
+  {
+    "id": "q02",
+    "question": "Why is chunk overlap used?",
+    "answer": "To preserve context across chunk boundaries.",
+    "relevant_keywords": [
+      "overlap",
+      "boundary"
+    ],
+    "relevant_sources": [
+      "architecture.md"
+    ]
+  },
+  {
+    "id": "q03",
+    "question": "Which vector store is used in this implementation?",
+    "answer": "Chroma with a persistent local client.",
+    "relevant_keywords": [
+      "Chroma",
+      "PersistentClient"
+    ],
+    "relevant_sources": [
+      "architecture.md"
+    ]
+  },
+  {
+    "id": "q04",
+    "question": "What makes ingestion idempotent?",
+    "answer": "Deterministic chunk IDs plus upsert.",
+    "relevant_keywords": [
+      "deterministic",
+      "upsert"
+    ],
+    "relevant_sources": [
+      "architecture.md"
+    ]
+  },
+  {
+    "id": "q05",
+    "question": "Which metadata fields are stored for each chunk?",
+    "answer": "Source, chunk index, start character, and end character.",
+    "relevant_keywords": [
+      "source",
+      "chunk_index",
+      "start_char",
+      "end_char"
+    ],
+    "relevant_sources": [
+      "architecture.md"
+    ]
+  },
+  {
+    "id": "q06",
+    "question": "What should the assistant say when retrieved context is insufficient?",
+    "answer": "I don't have enough relevant context to answer that.",
+    "relevant_keywords": [
+      "enough",
+      "context"
+    ],
+    "relevant_sources": [
+      "architecture.md"
+    ]
+  },
+  {
+    "id": "q07",
+    "question": "Which retrieval metrics are computed by the evaluation script?",
+    "answer": "Recall@k, Hit Rate, MRR, nDCG, and context precision.",
+    "relevant_keywords": [
+      "Recall",
+      "MRR",
+      "nDCG"
+    ],
+    "relevant_sources": [
+      "evaluation.md"
+    ]
+  },
+  {
+    "id": "q08",
+    "question": "How is context precision defined in this project?",
+    "answer": "The fraction of retrieved chunks that are relevant according to the evaluation gold criteria.",
+    "relevant_keywords": [
+      "context precision",
+      "retrieved",
+      "relevant"
+    ],
+    "relevant_sources": [
+      "evaluation.md"
+    ]
+  },
+  {
+    "id": "q09",
+    "question": "Why should k be configurable?",
+    "answer": "Different retrieval depths trade recall against context size and latency.",
+    "relevant_keywords": [
+      "k",
+      "recall",
+      "latency"
+    ],
+    "relevant_sources": [
+      "evaluation.md"
+    ]
+  },
+  {
+    "id": "q10",
+    "question": "What is the p50 latency?",
+    "answer": "The median latency across evaluation queries.",
+    "relevant_keywords": [
+      "p50",
+      "median",
+      "latency"
+    ],
+    "relevant_sources": [
+      "evaluation.md"
+    ]
+  },
+  {
+    "id": "q11",
+    "question": "What is the local vector storage cost assumption?",
+    "answer": "A small VM plus inexpensive disk is used as an explicit assumption.",
+    "relevant_keywords": [
+      "VM",
+      "disk",
+      "assumption"
+    ],
+    "relevant_sources": [
+      "cost_model.md"
+    ]
+  },
+  {
+    "id": "q12",
+    "question": "Why is a local store attractive for lightly queried indexes?",
+    "answer": "It avoids paying for always-on managed vector infrastructure.",
+    "relevant_keywords": [
+      "lightly",
+      "managed",
+      "infrastructure"
+    ],
+    "relevant_sources": [
+      "cost_model.md"
+    ]
+  },
+  {
+    "id": "q13",
+    "question": "When might a managed vector database become preferable?",
+    "answer": "When scale, availability, concurrency, operations, or managed features justify its cost.",
+    "relevant_keywords": [
+      "scale",
+      "availability",
+      "managed"
+    ],
+    "relevant_sources": [
+      "cost_model.md"
+    ]
+  },
+  {
+    "id": "q14",
+    "question": "What API endpoint answers a question?",
+    "answer": "POST /query.",
+    "relevant_keywords": [
+      "POST",
+      "/query"
+    ],
+    "relevant_sources": [
+      "api.md"
+    ]
+  },
+  {
+    "id": "q15",
+    "question": "What API endpoint runs ingestion?",
+    "answer": "POST /ingest.",
+    "relevant_keywords": [
+      "POST",
+      "/ingest"
+    ],
+    "relevant_sources": [
+      "api.md"
+    ]
+  }
+]
