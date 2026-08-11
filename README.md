@@ -1,99 +1,339 @@
-# Cost-Efficient RAG Application
+# Cost-Efficient RAG
 
-A submission-ready reference implementation for Problem 1 of the Applied AI / ML Engineering take-home.
+A lightweight Retrieval-Augmented Generation (RAG) application built to demonstrate that a local vector store can provide a practical, low-cost alternative to fully managed vector databases for lightly queried document collections.
 
-## What is implemented
+The system supports document ingestion, semantic retrieval, grounded LLM answers, evaluation, latency tracking, and cost analysis.
 
-- PDF / HTML / Markdown / TXT ingestion
-- configurable chunk size + overlap
-- deterministic chunk IDs + Chroma `upsert` for idempotent re-ingest
-- local persistent Chroma vector store
-- 384-dim local SentenceTransformer embeddings
-- top-k retrieval with configurable `k`
-- metadata filter by `source`
-- grounded LLM answer with citations and an explicit no-context fallback
-- FastAPI endpoints
-- per-query retrieval/LLM/total latency
-- LLM token usage logging when provider returns it
-- 15-question retrieval benchmark
-- Recall@k, Hit Rate, MRR, nDCG, Context Precision
-- assumption-based cost comparison at 100K / 1M / 10M vectors
-- configurable secrets via `.env`
+## Overview
 
-Chroma's Python API supports a persistent local client, metadata-filtered similarity search, and `upsert`, which is why it is a good fit for a small/lightly queried index. See the official Chroma docs: https://docs.trychroma.com/ (PersistentClient and collection upsert/query are documented there).
+This project was built for the **Cost-Efficient RAG** assignment, with the following goals:
 
-## 1. Setup
+- Build a working end-to-end RAG application
+- Use a low-cost vector store
+- Make ingestion configurable and idempotent
+- Measure retrieval quality using real IR metrics
+- Evaluate generated answers
+- Track latency and token usage
+- Compare estimated costs at different vector scales
+
+## Key Features
+
+- PDF, HTML, Markdown, and TXT ingestion
+- Configurable chunk size and overlap
+- Idempotent document re-ingestion
+- Persistent local ChromaDB vector store
+- `all-MiniLM-L6-v2` embeddings
+- 384-dimensional embeddings
+- Configurable Top-K retrieval
+- Metadata filtering by source
+- Grounded LLM responses with chunk citations
+- No-context fallback to reduce hallucination
+- FastAPI backend
+- Browser-based UI
+- Retrieval and generation latency tracking
+- Token usage logging
+- Retrieval evaluation with Recall@k, Hit Rate, MRR, nDCG, and Context Precision
+- Answer evaluation
+- Cost comparison for 100K, 1M, and 10M vectors
+
+## Architecture
+
+```text
+                    User
+                      |
+                      v
+              +---------------+
+              |    Web UI     |
+              | HTML/CSS/JS   |
+              +-------+-------+
+                      |
+                      v
+              +---------------+
+              |    FastAPI    |
+              |    Backend    |
+              +-------+-------+
+                      |
+          +-----------+-----------+
+          |                       |
+          v                       v
+   +-------------+        +---------------+
+   |   ChromaDB  |        | OpenAI-       |
+   | Local Store |        | Compatible LLM|
+   +------+------+        +---------------+
+          |
+          v
+   +-------------+
+   | Embeddings  |
+   | MiniLM-L6-v2|
+   | 384 dims    |
+   +-------------+
+```
+
+## Why ChromaDB?
+
+ChromaDB was selected because this project targets a potentially large but lightly queried index.
+
+A persistent local ChromaDB deployment provides:
+
+- Low infrastructure cost
+- No always-on managed vector database
+- Simple local development
+- Persistent vector storage
+- Metadata filtering
+- Upsert support for idempotent ingestion
+
+The trade-off is that backups, high availability, scaling, and operational maintenance remain the responsibility of the application owner.
+
+## Project Structure
+
+```text
+cost_efficient_rag/
+│
+├── app/
+│   ├── chunking.py       # Document chunking
+│   ├── config.py         # Environment configuration
+│   ├── ingest.py         # Document ingestion
+│   ├── llm.py            # LLM interaction
+│   ├── loaders.py        # PDF/HTML/MD/TXT loaders
+│   ├── main.py           # FastAPI application
+│   ├── rag.py            # Retrieval and RAG pipeline
+│   └── vectorstore.py    # ChromaDB integration
+│
+├── data/docs/            # Sample document corpus
+├── eval/
+│   ├── answer_eval.py    # Answer evaluation
+│   ├── evaluate.py       # Retrieval evaluation
+│   └── questions.json    # 15 evaluation questions
+│
+├── reports/              # Query logs and generated reports
+├── scripts/
+│   └── cost_analysis.py  # Cost comparison
+├── tests/                # Unit tests
+├── ui/
+│   └── index.html        # Web interface
+│
+├── .env.example
+├── .gitignore
+├── requirements.txt
+└── README.md
+```
+
+## Quick Start
+
+### 1. Create the environment
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+### 2. Install dependencies
 
 ```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-# source .venv/bin/activate
-
 pip install -r requirements.txt
-copy .env.example .env
 ```
 
-The first run downloads the embedding model.
+### 3. Configure `.env`
 
-Set an OpenAI-compatible LLM in `.env`:
+Create a `.env` file using `.env.example`.
 
-```text
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=YOUR_KEY
-LLM_MODEL=gpt-4o-mini
-```
+Example local configuration:
 
-Or use a local OpenAI-compatible server such as Ollama:
+```env
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 
-```text
-LLM_BASE_URL=http://localhost:11434/v1
 LLM_API_KEY=
-LLM_MODEL=YOUR_LOCAL_MODEL
+LLM_MODEL=gemma3:4b
+LLM_BASE_URL=http://localhost:11434/v1
+
+CHROMA_PATH=./storage/chroma
+COLLECTION_NAME=rag_chunks
+
+DEFAULT_CHUNK_SIZE=900
+DEFAULT_CHUNK_OVERLAP=120
+
+DEFAULT_TOP_K=5
+MAX_TOP_K=20
 ```
 
-## 2. Ingest
+The embedding model runs locally.
+
+The example configuration uses **Ollama + Gemma 3 4B** as the local LLM.
+
+### 4. Start the LLM
+
+Make sure Ollama is running:
+
+```bash
+ollama run gemma3:4b
+```
+
+### 5. Ingest documents
+
+```bash
+python -m app.ingest data/docs
+```
+
+Default chunking:
+
+```text
+Chunk size : 900 characters
+Overlap    : 120 characters
+```
+
+Custom values can be provided:
 
 ```bash
 python -m app.ingest data/docs --chunk-size 900 --overlap 120
 ```
 
-Run it twice. The vector count should remain stable because chunk IDs are deterministic and the store uses upsert.
-
-## 3. Start API
+### 6. Start the API
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Open the interactive API docs at `/docs`.
+Open:
+
+- **Web UI:** `http://127.0.0.1:8000/`
+- **API docs:** `http://127.0.0.1:8000/docs`
+
+## How It Works
+
+```text
+Documents
+   ↓
+Load & Extract Text
+   ↓
+Chunk Documents
+   ↓
+Generate Embeddings
+   ↓
+Store in ChromaDB
+   ↓
+User Question
+   ↓
+Question Embedding
+   ↓
+Top-K Retrieval
+   ↓
+Grounded Context
+   ↓
+LLM
+   ↓
+Answer + Citations
+```
+
+## Ingestion
+
+The ingestion pipeline supports:
+
+- PDF
+- HTML
+- Markdown
+- TXT
+
+Each chunk contains metadata including:
+
+```text
+source
+chunk_index
+start_char
+end_char
+```
+
+The `source` metadata can be used as a retrieval filter.
+
+### Idempotent Re-ingestion
+
+Chunk IDs are generated deterministically from the source, chunk index, and chunk content.
+
+ChromaDB `upsert` is then used instead of `add`.
+
+Therefore, running ingestion multiple times does not create duplicate vectors.
 
 Example:
 
-```bash
-curl -X POST http://127.0.0.1:8000/query ^
-  -H "Content-Type: application/json" ^
-  -d "{"question":"Why is ingestion idempotent?","k":5}"
+```text
+First run:
+6 files
+14 chunks upserted
+21 total vectors
+
+Second run:
+6 files
+14 chunks upserted
+21 total vectors
 ```
 
-For Linux/macOS use `\` instead of `^`.
+The vector count remains stable.
 
-Metadata filter example:
+## Retrieval
+
+The system performs semantic Top-K retrieval.
+
+Example request:
 
 ```json
-{"question":"What is the chunk size?","k":5,"source":"architecture.md"}
+{
+  "question": "What embedding model is used?",
+  "k": 5
+}
 ```
 
-## 4. Retrieval evaluation
+A source filter can also be supplied:
 
-First ingest the sample corpus, then:
-
-```bash
-python eval/evaluate.py 5
+```json
+{
+  "question": "What embedding model is used?",
+  "k": 5,
+  "source": "architecture.md"
+}
 ```
 
-Run different k values:
+## Grounded Generation
+
+Retrieved chunks are passed to the LLM as context.
+
+The generation prompt instructs the model to:
+
+- Answer using the retrieved evidence
+- Cite the chunks it uses
+- Avoid unsupported information
+- Return a clear fallback when relevant evidence is unavailable
+
+Example:
+
+```text
+The embedding model is
+sentence-transformers/all-MiniLM-L6-v2 [1].
+```
+
+If there is insufficient context:
+
+```text
+I don't have enough relevant context to answer that.
+```
+
+## Evaluation
+
+The project uses a fixed set of **15 questions** located in:
+
+```text
+eval/questions.json
+```
+
+### Retrieval Metrics
+
+The retrieval evaluation measures:
+
+- Recall@k
+- Hit Rate
+- MRR
+- nDCG
+- Context Precision
+
+Run:
 
 ```bash
 python eval/evaluate.py 3
@@ -101,81 +341,166 @@ python eval/evaluate.py 5
 python eval/evaluate.py 8
 ```
 
-Record the resulting metrics in your final report. Do not invent numbers.
+This allows different Top-K configurations to be compared.
 
-## 5. Cost comparison
+### Answer Evaluation
+
+Answer evaluation is implemented in:
+
+```text
+eval/answer_eval.py
+```
+
+Run:
+
+```bash
+python eval/answer_eval.py
+```
+
+The evaluation focuses on whether generated answers are supported by the retrieved context and whether they address the question.
+
+## Latency & Logging
+
+Each query records:
+
+- Retrieval latency
+- LLM latency
+- Total latency
+- Retrieved chunk count
+- Retrieved chunk IDs
+- Token usage when provided by the LLM
+
+Logs are written to:
+
+```text
+reports/query_log.jsonl
+```
+
+This allows query performance to be analyzed after running the application.
+
+## Cost Analysis
+
+The project includes a cost-analysis script:
 
 ```bash
 python scripts/cost_analysis.py
 ```
 
-This creates `reports/cost_comparison.csv`.
+The comparison considers:
 
-Important: the managed-store numbers are explicitly scenario assumptions, not vendor quotes. Replace them with the provider you would actually deploy if asked for a production estimate.
+```text
+100K vectors
+1M vectors
+10M vectors
+```
 
-## 6. Design decisions
+The managed-vector-database figures are **scenario assumptions**, not vendor quotations.
 
-### Why Chroma?
+The purpose is to compare the cost characteristics of local vector storage against always-on managed vector infrastructure.
 
-For this assignment the workload is a lightly queried index where always-on managed vector infrastructure can dominate cost. Chroma can persist locally, which keeps the architecture simple and avoids a separate vector service. The trade-off is that the local deployment is responsible for backups, high availability, scaling and operations.
+## Design Trade-offs
 
-### Why local embeddings?
+### Strengths
 
-`all-MiniLM-L6-v2` is small and runs locally, so ingestion does not require a second paid embedding API. The downside is that embedding quality may be below a larger hosted embedding model.
+- Low infrastructure cost
+- Simple architecture
+- Local embeddings
+- Persistent vector storage
+- Idempotent ingestion
+- Metadata filtering
+- Measurable retrieval quality
+- Query-level performance logging
 
-### Why deterministic IDs?
+### Limitations
 
-A chunk ID is derived from source + chunk index + chunk text. Re-ingesting unchanged documents therefore addresses the same records. `upsert` updates changed records instead of creating duplicates.
+- Local storage requires manual operational management
+- No built-in high availability
+- Backups must be handled separately
+- Scaling requires additional infrastructure
+- Local LLM latency depends on available hardware
+- Embedding quality depends on the selected model
 
-### Why retrieval metrics?
+## When Would I Use a Managed Vector Database?
 
-A good answer can hide poor retrieval. Recall@k, MRR, nDCG and context precision expose retrieval quality independently of the LLM.
+I would consider switching back to a managed vector database when operational requirements become more important than infrastructure cost.
 
-### Weak link / when to switch back to managed
+Examples include:
 
-The weak link is operational scale. A local persistent store is excellent for a small, lightly queried corpus, but managed infrastructure becomes attractive when uptime, concurrency, multi-node scaling, backups, and operational simplicity matter more than the lowest fixed cost.
+- High query concurrency
+- Strict availability requirements
+- Distributed deployments
+- Automatic backups
+- Disaster recovery
+- Multi-node scaling
+- Large production workloads
+- Reduced operational overhead
 
-## 7. Submission checklist
+For a small or lightly queried corpus, the local ChromaDB approach provides a simpler and more cost-efficient architecture.
 
-- [ ] `.env` is NOT committed
-- [ ] `storage/` is NOT committed
-- [ ] Run ingestion twice and record stable vector count
-- [ ] Run retrieval evaluation for k=3,5,8
-- [ ] Run 15 answer questions and save representative outputs
-- [ ] Report p50/p95 latency from actual runs
-- [ ] Report token usage from actual runs
-- [ ] Run cost analysis and explain assumptions
-- [ ] Include one screenshot of `/docs` and one sample grounded answer
-- [ ] Mention limitations honestly
-
-## Suggested report structure
-
-1. Architecture
-2. Chunking and ingestion
-3. Retrieval design
-4. Answer grounding
-5. Retrieval evaluation
-6. Answer evaluation
-7. Cost analysis
-8. Trade-offs / weak link
-9. How to reproduce
-
-## Scoring alignment
+## Requirement Coverage
 
 | Requirement | Implementation |
 |---|---|
-| PDF/HTML/MD | `app/loaders.py` |
-| configurable chunks | `app/chunking.py`, CLI/API |
-| idempotent ingest | deterministic IDs + `upsert` |
-| embeddings | SentenceTransformer |
-| vector + metadata | Chroma |
-| metadata filter | `source` in `/retrieve` and `/query` |
-| top-k | `k` parameter |
-| grounded answer | `app/llm.py` |
-| no-context behavior | explicit fallback in system prompt |
-| HTTP endpoint | FastAPI |
-| env config | `.env` |
-| latency/chunks/tokens | API response + logs/usage |
-| Recall/Hit/MRR/nDCG/context precision | `eval/evaluate.py` |
-| 15–30 questions | `eval/questions.json` has 15 |
-| cost at scale | `scripts/cost_analysis.py` |
+| PDF / HTML / MD ingestion | `app/loaders.py` |
+| Configurable chunking | `app/chunking.py` |
+| Idempotent ingestion | Deterministic IDs + ChromaDB `upsert` |
+| Embeddings | Sentence Transformers |
+| 384-dimensional vectors | `all-MiniLM-L6-v2` |
+| Vector store | ChromaDB |
+| Metadata filter | `source` |
+| Top-K retrieval | Configurable `k` |
+| Grounded answers | `app/rag.py` + `app/llm.py` |
+| Chunk citations | `[1]`, `[2]`, etc. |
+| No-context fallback | Grounded prompt |
+| HTTP API | FastAPI |
+| Environment configuration | `.env` |
+| Latency logging | `reports/query_log.jsonl` |
+| Retrieval evaluation | `eval/evaluate.py` |
+| Answer evaluation | `eval/answer_eval.py` |
+| Cost analysis | `scripts/cost_analysis.py` |
+
+## Reproduce the Project
+
+```bash
+# Create environment
+python -m venv .venv
+
+# Activate
+.venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure .env
+
+# Start local LLM
+ollama run gemma3:4b
+
+# Ingest documents
+python -m app.ingest data/docs
+
+# Start API
+uvicorn app.main:app --reload
+
+# Run retrieval evaluation
+python eval/evaluate.py 5
+
+# Run answer evaluation
+python eval/answer_eval.py
+
+# Run cost analysis
+python scripts/cost_analysis.py
+```
+
+## Notes
+
+- `.env` should never be committed.
+- `storage/` contains generated ChromaDB data and is excluded from Git.
+- The embedding model is downloaded on first use.
+- Ollama must be running when using the local LLM configuration.
+- Evaluation results depend on the evaluation dataset and configured LLM.
+- Cost estimates depend on the assumptions defined in the cost-analysis script.
+
+## License
+
+This project is intended for educational, experimental, and placement evaluation purposes.
